@@ -251,3 +251,11 @@ share's permissions the normal way. Don't force it.
   and **skips rather than degrades**: a WebP into `.m4a` can't work, so it warns and
   leaves the file alone instead of silently recompressing your art.
 - Neither script recompresses audio or images — everything is a stream copy (`-c copy`).
+
+## License
+
+MIT — see [LICENSE](LICENSE). Copyright (c) 2026 Tim Case.
+
+Take the ffmpeg incantations out of `SKILL.md` and use them in your own scripts; that's what
+they're there for. Attribution is appreciated but the license only asks you to keep the copyright
+notice with substantial copies.

@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: 2026 Tim Case
+#
 # bulk-retag.sh — reliably set the same tag field(s) on every audio file under a directory.
 #
 # Uses ffmpeg: format-universal (mp3/flac/m4a/mpc/wma/ogg/opus/aac), correct UTF encoding,

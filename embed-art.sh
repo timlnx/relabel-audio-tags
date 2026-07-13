@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: 2026 Tim Case
+#
 # embed-art.sh — embed a cover image into every audio file under a directory, VERBATIM.
 #
 # The image's exact bytes are stream-copied in (-c copy): a PNG stays a PNG, a JPEG stays a

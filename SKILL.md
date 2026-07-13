@@ -1,6 +1,7 @@
 ---
 name: relabel-audio-tags
 description: Use when bulk-correcting or normalizing audio metadata in a directory — a fragmented or duplicated artist listing, garbage "numeric" artists (01, 02, 03…), mojibake / wrong-encoding tags (Ã¼ instead of ü), an artist split by an umlaut or spelling variant, inconsistent artist/album/disc/track across a mixed-format music library (mp3, mpc, m4a, wma, flac, ogg, opus), or embedding album / cover art into files verbatim (without recompressing the image), including when a media server (Navidrome, Subsonic, Plex, Jellyfin) keeps showing stale tags after edits.
+license: MIT
 ---
 
 # Relabel Audio Tags
