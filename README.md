@@ -150,8 +150,26 @@ nothing and often changes what you'd have asked for.
 
 ## Requires
 
-`ffmpeg` and `ffprobe` — `brew install ffmpeg` or `apt install ffmpeg`. Nothing else.
-The scripts check for both and exit with a clear message if they're absent.
+`ffmpeg` and `ffprobe` — nothing else. The scripts check for both and exit with a clear
+message if they're absent.
+
+```bash
+# macOS
+brew install ffmpeg
+
+# Fedora / RHEL — ffmpeg proper lives in RPM Fusion, not the default repos
+sudo dnf install -y \
+  https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm
+sudo dnf install -y ffmpeg
+
+# Debian / Ubuntu
+sudo apt install ffmpeg
+```
+
+On Fedora, `dnf install ffmpeg` without RPM Fusion gets you `ffmpeg-free`, which is built
+without some patent-encumbered codecs. For this skill that's mostly fine — retagging is a
+stream copy, not a re-encode — but `ffmpeg-free` can be missing decoders for formats you own,
+and you'd rather find that out now than halfway through a library.
 
 ## The scripts
 

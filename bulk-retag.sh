@@ -43,8 +43,8 @@ for kv in "$@"; do
     *) echo "error: argument '$kv' is not KEY=VALUE" >&2; exit 1 ;;
   esac
 done
-command -v ffmpeg  >/dev/null 2>&1 || { echo "error: ffmpeg not found (brew install ffmpeg / apt install ffmpeg)" >&2; exit 1; }
-command -v ffprobe >/dev/null 2>&1 || { echo "error: ffprobe not found (brew install ffmpeg / apt install ffmpeg)" >&2; exit 1; }
+command -v ffmpeg  >/dev/null 2>&1 || { echo "error: ffmpeg not found (brew install ffmpeg / dnf install ffmpeg / apt install ffmpeg)" >&2; exit 1; }
+command -v ffprobe >/dev/null 2>&1 || { echo "error: ffprobe not found (brew install ffmpeg / dnf install ffmpeg / apt install ffmpeg)" >&2; exit 1; }
 
 # Write each tag at BOTH container and stream level (see note 1 above).
 META=()

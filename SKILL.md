@@ -8,7 +8,7 @@ description: Use when bulk-correcting or normalizing audio metadata in a directo
 ## Overview
 Bulk-fix music metadata reliably across mixed formats. Core insight: **`ffmpeg` is the only tag writer that is both format-universal AND encoding-correct — use it, and verify every write with an independent reader (`ffprobe`), because taggers lie about success.**
 
-**Requires `ffmpeg` + `ffprobe`** (`brew install ffmpeg` / `apt install ffmpeg`). The scripts check and exit with a clear message if missing.
+**Requires `ffmpeg` + `ffprobe`** (`brew install ffmpeg` / `dnf install ffmpeg` on Fedora, needs RPM Fusion / `apt install ffmpeg`). The scripts check and exit with a clear message if missing.
 
 ## Workflow
 1. **Survey first — never write blind.** Count formats and inspect current tags:

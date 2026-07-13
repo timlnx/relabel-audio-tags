@@ -14,7 +14,7 @@ DIR="${1:?usage: embed-art.sh <dir> <image-file>}"
 IMG="${2:?usage: embed-art.sh <dir> <image-file>}"
 [ -d "$DIR" ] || { echo "error: not a directory: $DIR" >&2; exit 1; }
 [ -f "$IMG" ] || { echo "error: no such image file: $IMG" >&2; exit 1; }
-command -v ffmpeg >/dev/null 2>&1 || { echo "error: ffmpeg not found (brew install ffmpeg / apt install ffmpeg)" >&2; exit 1; }
+command -v ffmpeg >/dev/null 2>&1 || { echo "error: ffmpeg not found (brew install ffmpeg / dnf install ffmpeg / apt install ffmpeg)" >&2; exit 1; }
 
 # --- guardrail: must be a real image, else refuse (blocks .exe/pdf/zip/etc.) ---
 MIME="$(file --mime-type -b "$IMG")"
