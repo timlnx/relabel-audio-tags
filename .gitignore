@@ -1,0 +1,8 @@
+# Tag backups default to $TMPDIR, but if someone points RETAG_BACKUP_DIR here,
+# don't commit their library's file paths and metadata.
+backups/
+*.tags.tsv
+
+# Claude Code / OMC session artifacts — not part of the skill.
+.omc/
+.remember/
