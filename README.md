@@ -225,6 +225,24 @@ Known dead ends it will tell you about rather than silently botch: raw ADTS `.aa
 tags at all (remux to `.m4a`), and ffmpeg can't embed cover art into `.ogg`/`.opus` (needs
 kid3-cli).
 
+## If your music lives on a NAS
+
+Run it with a settle delay:
+
+```bash
+RETAG_SETTLE=2 ./bulk-retag.sh "/Volumes/Media/Music/Some Artist" artist="Some Artist"
+```
+
+Over SMB, a mutating call can **report failure on an operation that actually succeeded** — `mv`
+prints `Permission denied` and the file moved anyway — while a file you just wrote can read back
+*stale* from the client cache. Same error, opposite realities, so exit codes are worthless here.
+Both scripts handle this by mutating, settling, and then letting an independent re-read decide what
+really happened; `RETAG_SETTLE` sets how long to wait before that read. Without it on a network
+share, files that were tagged perfectly can report `MISMATCH`.
+
+If a file still won't budge after the retries, its directory is genuinely read-only — fix the
+share's permissions the normal way. Don't force it.
+
 ## Safety notes
 
 - Both scripts write to a temp file and `mv` it into place, so an interrupted run

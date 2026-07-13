@@ -50,6 +50,35 @@ command -v ffprobe >/dev/null 2>&1 || { echo "error: ffprobe not found (brew ins
 META=()
 for kv in "$@"; do META+=(-metadata "$kv" -metadata:s:a "$kv"); done
 
+# --- network-share (NAS / SMB / NFS) handling ------------------------------------------
+# On SMB mounts, mutating calls (rename/unlink) can report FAILURE ON AN OPERATION THAT
+# ACTUALLY SUCCEEDED -- `mv` prints "Permission denied" and the file moved anyway. They can
+# also genuinely fail on a scattered subset. So: never trust the exit code of a mutate here,
+# and never immediately re-read a file you just wrote (the client cache may still be stale).
+# Mutate -> settle -> re-read, and let the RE-READ decide what happened.
+#
+# RETAG_SETTLE=<seconds> pauses after each write before verifying. Default 0 (local disk).
+# On a NAS, set 1-3. Costs a few seconds per file; saves you a false "FAIL" on every one.
+SETTLE="${RETAG_SETTLE:-0}"
+settle() {
+  [ "${1:-0}" = "0" ] && return 0
+  sleep "$1" 2>/dev/null \
+    || python3 -c "import time,sys;time.sleep(float(sys.argv[1]))" "$1" 2>/dev/null \
+    || perl -e "select(undef,undef,undef,$1)" 2>/dev/null || true
+}
+
+# Atomic replace that survives a lying rename(). If mv reports failure, check whether it
+# actually happened before believing it; only a tmp file that is STILL THERE means it didn't.
+replace_atomic() {
+  local tmp="$1" dst="$2" t
+  for t in 0 1 2 4; do
+    settle "$t"
+    mv -f "$tmp" "$dst" 2>/dev/null && return 0
+    [ -e "$tmp" ] || return 0   # tmp is gone => the rename landed despite the error
+  done
+  return 1
+}
+
 # Read a tag back regardless of which level it lives at (see note 2 above).
 # The trailing `|| true` is load-bearing: a MISSING tag makes grep exit 1, and under
 # `set -euo pipefail` that would kill the script on exactly the case we need to REPORT.
@@ -88,14 +117,21 @@ while IFS= read -r -d '' f; do
   out=(-map 0 -c copy)
   [ "$ext" = "mp3" ] && out+=(-id3v2_version 3)
 
-  # 3) write to temp, then atomic replace
+  # 3) write to temp, then atomic replace (rename-tolerant; see network-share note above)
   tmp="${f%.*}.__retag__.$ext"
-  if ! { ffmpeg -y -loglevel error -i "$f" "${out[@]}" "${META[@]}" "$tmp" 2>/dev/null && mv -f "$tmp" "$f"; }; then
+  if ! ffmpeg -y -loglevel error -i "$f" "${out[@]}" "${META[@]}" "$tmp" 2>/dev/null || [ ! -s "$tmp" ]; then
     fail=$((fail+1)); echo "  FAIL (ffmpeg): ${f#"$DIR"/}" >&2; rm -f "$tmp"
     continue
   fi
+  if ! replace_atomic "$tmp" "$f"; then
+    fail=$((fail+1)); echo "  FAIL (could not replace file — is the directory writable?): ${f#"$DIR"/}" >&2
+    rm -f "$tmp"
+    continue
+  fi
 
-  # 4) VERIFY with an independent reader — never trust the writer's exit code
+  # 4) VERIFY with an independent reader — never trust the writer's exit code.
+  #    On a network share, settle first or you may read a stale cached copy.
+  settle "$SETTLE"
   mismatch=""
   for kv in "$@"; do
     key="${kv%%=*}"; want="${kv#*=}"
@@ -125,5 +161,9 @@ echo "tag backup: $BK"
 if [ "$bad" -gt 0 ] || [ "$fail" -gt 0 ]; then
   echo "!! Not everything took. The MISMATCH lines above are files whose tags did NOT land." >&2
   echo "!! Original tags are in the backup TSV above. Do not assume the library is clean." >&2
+  if [ "$SETTLE" = "0" ]; then
+    echo "!! On a network share (NAS/SMB/NFS)? Retry with RETAG_SETTLE=2 — a stale client cache" >&2
+    echo "!! can make a write that actually landed read back as wrong." >&2
+  fi
   exit 1
 fi

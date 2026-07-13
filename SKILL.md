@@ -74,9 +74,45 @@ read_tag() { ffprobe -v quiet -show_entries "format_tags=${1}:stream_tags=${1}" 
 | ffmpeg says ok, but **.ogg/.opus keep the old artist** | Ogg tags live at STREAM level; plain `-metadata` doesn't reach them | Also pass `-metadata:s:a` (see Ogg/Opus trap) |
 | ffprobe shows **no tags at all** on .ogg/.opus | You read `format_tags`; Ogg keeps them in `stream_tags` | Read both (see Ogg/Opus trap) |
 | Tags won't stick to a `.aac` no matter what | Raw ADTS has no metadata container | Remux to `.m4a`, then tag |
+| `mv: … Permission denied` on a NAS — **but the file moved anyway** | SMB reports failure on a `rename()` that succeeded | Mutate → settle → re-read; believe the re-read (see NAS troubleshooting) |
+| Just-written file reads back with the OLD tags | Stale client cache on the network share | `RETAG_SETTLE=2` — pause before verifying |
 | Fixed the file, server still shows old | In-place edits change file mtime but **not folder mtime**; incremental scanners skip it | Full rescan ignoring timestamps (below) |
 | "file not found" from a DB path | Unicode normalization: DB (NFC) vs macOS/SMB filesystem (NFD) | Locate via `find -ipath '*pattern*'`, don't rebuild paths from DB strings |
 | Media-server host alerts "container stopped" | throwaway `docker run --rm` query containers exiting | Query via `docker exec <running-container>` instead of spawning new ones |
+
+## Troubleshooting: the library lives on a NAS (SMB / NFS network share)
+This is its own category of pain, and the failures are **liars in both directions**.
+
+On an SMB mount, a mutating call (`rename`, `unlink`) can **report failure on an operation that actually succeeded** — `mv` prints `Permission denied` and the file moved anyway. It will also *genuinely* fail on a scattered subset of files. Same error message, opposite realities. Meanwhile a file you just wrote can **read back stale** from the client cache, so an immediate verify reports the old tags on a write that was fine.
+
+The rule that survives both:
+
+> **Never trust the exit code of a mutate on a network share. Mutate → settle → re-read, and let the RE-READ decide what happened.**
+
+```bash
+# a delay that works even where `sleep` is unavailable/blocked
+settle(){ sleep "$1" 2>/dev/null \
+  || python3 -c "import time,sys;time.sleep(float(sys.argv[1]))" "$1" 2>/dev/null \
+  || perl -e "select(undef,undef,undef,$1)" 2>/dev/null || true; }
+
+# atomic replace that survives a lying rename(): only a tmp file that is STILL THERE
+# means the move didn't happen. Retry with backoff, re-checking reality each time.
+replace_atomic(){
+  local tmp="$1" dst="$2" t
+  for t in 0 1 2 4; do
+    settle "$t"
+    mv -f "$tmp" "$dst" 2>/dev/null && return 0
+    [ -e "$tmp" ] || return 0     # gone => it landed despite the error
+  done
+  return 1
+}
+```
+
+Both scripts already do this. **`RETAG_SETTLE=2 ./bulk-retag.sh …`** adds a pause after every write before verifying — use it on any network share; without it, a stale read can report `MISMATCH` on a file that is perfectly fine.
+
+Two more hard-won bits:
+- **Check state before retrying a mutate.** A retry that *assumes* the first attempt failed can double-apply (delete the wrong thing, clobber a file that already moved). Re-read first, act second.
+- **If a file genuinely won't budge after backoff, the containing directory is read-only** — that is a permissions problem on the share, and the honest fix is to correct the share's permissions through whatever normally administers it. Don't try to force it, and don't escalate privileges to win the argument with a filesystem.
 
 ## Stale Library (Navidrome / Subsonic)
 Force a mtime-independent re-read, then confirm against the server's OWN database (ground truth for what users see — it can disagree with the file when a stale tag or cache is involved):

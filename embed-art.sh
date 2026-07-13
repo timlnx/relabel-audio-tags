@@ -26,6 +26,27 @@ esac
 SZ="$(stat -f%z "$IMG" 2>/dev/null || stat -c%s "$IMG")"
 echo "cover: $IMG  ($MIME, $SZ bytes) — embedding VERBATIM (stream-copied, no recompression)"
 
+# --- network-share (NAS / SMB / NFS) handling ---
+# SMB can report "Permission denied" on a rename that ACTUALLY SUCCEEDED. Don't trust the
+# exit code of a mutate: settle, then check whether it really happened. RETAG_SETTLE=<secs>
+# adds a pause after each write (default 0; use 1-3 on a NAS).
+SETTLE="${RETAG_SETTLE:-0}"
+settle() {
+  [ "${1:-0}" = "0" ] && return 0
+  sleep "$1" 2>/dev/null \
+    || python3 -c "import time,sys;time.sleep(float(sys.argv[1]))" "$1" 2>/dev/null \
+    || perl -e "select(undef,undef,undef,$1)" 2>/dev/null || true
+}
+replace_atomic() {
+  local tmp="$1" dst="$2" t
+  for t in 0 1 2 4; do
+    settle "$t"
+    mv -f "$tmp" "$dst" 2>/dev/null && return 0
+    [ -e "$tmp" ] || return 0   # tmp gone => the rename landed despite the error
+  done
+  return 1
+}
+
 ok=0; skip=0
 while IFS= read -r -d '' f; do
   ext="$(printf %s "${f##*.}" | tr 'A-Z' 'a-z')"
@@ -47,7 +68,9 @@ while IFS= read -r -d '' f; do
        -metadata:s:v title="Album cover" -metadata:s:v comment="Cover (front)")
   [ "$ext" = "mp3" ] && out+=(-id3v2_version 3)
   tmp="${f%.*}.__art__.$ext"
-  if ffmpeg -y -loglevel error -i "$f" -i "$IMG" "${out[@]}" "$tmp" 2>/dev/null && mv -f "$tmp" "$f"; then
+  if ffmpeg -y -loglevel error -i "$f" -i "$IMG" "${out[@]}" "$tmp" 2>/dev/null && [ -s "$tmp" ] \
+     && replace_atomic "$tmp" "$f"; then
+    settle "$SETTLE"
     ok=$((ok+1)); echo "  ok: ${f#"$DIR"/}"
   else
     echo "  SKIP (ffmpeg could not embed the art here — file left UNTOUCHED, not degraded): ${f#"$DIR"/}" >&2
