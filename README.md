@@ -37,6 +37,117 @@ To update later: `git -C ~/.claude/skills/relabel-audio-tags pull`.
 No-git alternative: download the ZIP, unpack it, and make sure the resulting directory is named
 `relabel-audio-tags` before moving it into `~/.claude/skills/`.
 
+## Examples
+
+You don't run the scripts yourself and you don't invoke the skill by name — **you just describe
+the mess in plain English and Claude picks the skill up on its own.** The examples below are
+things you'd literally type.
+
+Two habits make everything below go better:
+
+- **Give an absolute path.** Claude can find your library, but "the Beatles folder" costs a round
+  of guessing and risks it touching the wrong directory. `/Volumes/Media/Music/Beatles` doesn't.
+- **Ask for a dry run first on anything big.** `bulk-retag.sh --dry-run` writes nothing and lists
+  exactly what it would touch. On someone's real library, that's cheap insurance.
+
+### The classic: an album that exploded into fake artists
+
+```
+The rips in /Volumes/Media/Music/Kollaps have track numbers as the artist, so my
+music server thinks there are 9 different artists named 01, 02, 03. They're all
+Einstürzende Neubauten, album "Kollaps". Fix the tags, dry run first.
+```
+
+This is the case the skill was built for. Claude will survey the formats, back up the existing
+tags, set `artist` and `album_artist` to one canonical value, and re-read every file to prove it
+landed.
+
+### Names in a file — one title per track
+
+```
+Relabel the files in /Volumes/Media/Music/Bootleg/1981-Berlin/, the song names
+are in songs.txt (one per line, in track order). Set the title and track number
+on each file, and leave everything else alone.
+```
+
+Worth calling out because this is *not* what `bulk-retag.sh` does — that script sets the **same**
+value on every file. Per-file values (titles, track numbers, disc numbers) need a loop, and Claude
+will write one using the skill's guidance. **Have it show you the filename-to-title pairing before
+it writes anything** — an off-by-one against a text file mislabels the whole album, and the
+filenames are rarely in the order you assume.
+
+### Look it up online
+
+```
+/Volumes/Media/Music/unknown-album-3 has no useful tags at all — just track01.mp3
+through track11.mp3. Figure out what this album actually is (durations and any
+embedded junk might help), find the best match online, show me your evidence and
+your confidence, then tag it once I confirm.
+```
+
+Claude can search the web (MusicBrainz, Discogs) and reason from track count and durations, but a
+confident-sounding wrong match will happily overwrite good metadata. **Ask for the evidence and
+approve the match before the write.** "Show me your confidence" is doing real work in that prompt.
+
+### Merge an artist that split in two
+
+```
+My library lists "Einstürzende Neubauten" and "Einsturzende Neubauten" as two
+separate artists, and I think there's a "Einstuerzende Neubauten" too. Find every
+variant under /Volumes/Media/Music and normalize them all to the umlaut spelling.
+```
+
+One character makes two artists as far as a media server is concerned. Note this one asks Claude
+to **find** the variants first — you don't have to know all of them up front.
+
+### Mojibake from a bad tagger
+
+```
+Something re-tagged half my library with the id3v2 tool and now everything with an
+accent is garbage — "Ã¼" where "ü" should be, "Ã©" for "é". Scan
+/Volumes/Media/Music/Bjork and repair the encoding without touching anything else.
+```
+
+### Cover art, exactly as-is
+
+```
+Put ~/Downloads/kollaps-front.png on every track in /Volumes/Media/Music/Kollaps.
+Do not recompress it — I want the exact PNG bytes in the files.
+```
+
+The skill embeds art by stream copy and can prove it: it extracts the art back out and byte-compares
+it to your source. Ask it to. (It will also *refuse* to convert rather than quietly degrade — a WebP
+into `.m4a` can't work, so it skips and tells you.)
+
+### Disc and track numbers from the folder layout
+
+```
+/Volumes/Media/Music/Some Box Set has CD1/ through CD4/ subfolders and the track
+number is the first two digits of each filename. Set disc and track accordingly,
+and set album to "Some Box Set" on all of them.
+```
+
+### The server won't admit you fixed anything
+
+```
+I retagged everything under /Volumes/Media/Music/Kollaps but Navidrome still shows
+the old artists. My Navidrome runs in a docker container called "navidrome".
+```
+
+Editing a file in place changes the *file's* mtime but not the *folder's*, so incremental scanners
+skip it entirely. The skill knows to force a full, timestamp-ignoring rescan and then verify
+against the server's own database — which is the ground truth for what you actually see in the UI.
+
+### Just tell me what's wrong first
+
+```
+Survey the tags under /Volumes/Media/Music/Kollaps and tell me what's broken.
+Don't change anything yet.
+```
+
+A perfectly good way to start. The skill's first rule is *never write blind* — a survey pass costs
+nothing and often changes what you'd have asked for.
+
 ## Requires
 
 `ffmpeg` and `ffprobe` — `brew install ffmpeg` or `apt install ffmpeg`. Nothing else.
